@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 # Change to your project name
-project(Learning VERSION 0.0.0)
+project(Basic-EQ VERSION 0.0.0)
 
 
 set(CMAKE_CXX_STANDARD 20)
@@ -48,7 +48,7 @@ juce_add_plugin(${PROJECT_NAME}
         PLUGIN_MANUFACTURER_CODE Lrn1
         PLUGIN_CODE Oaks
         FORMATS VST3 AU Standalone
-        PRODUCT_NAME "EQ"        
+        PRODUCT_NAME "Basic-EQ"
 )
 
 juce_generate_juce_header(${PROJECT_NAME})

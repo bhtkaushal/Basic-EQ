@@ -3,6 +3,14 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+struct ChainSettings {
+    float peakFreq {0}, peakQ {1.f},peakGain {0};
+    float lowCut {0}, highCut {0};
+    float lowCutSlope {0}, highCutSlope {0};
+};
+
+ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& apvts);
+
 class SimpleEQProcessor final : public juce::AudioProcessor
 {
 public:
@@ -40,10 +48,18 @@ public:
         *this, nullptr, "Parameters", createParameterLayout()
     };
 
+
 private:
+    void updatePeakCoefficients();
     using Filter = juce::dsp::IIR::Filter<float>;
     using CutoffChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
     using MonoChain = juce::dsp::ProcessorChain<CutoffChain, Filter, CutoffChain>;
     MonoChain leftChain, rightChain;
+    enum MonoPosition {
+        LowCut = 0,
+        Peak,
+        HighCut,
+    };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SimpleEQProcessor)
 };

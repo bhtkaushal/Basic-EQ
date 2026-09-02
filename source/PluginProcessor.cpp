@@ -1,6 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-
+#include "juce_graphics/fonts/harfbuzz/hb-aat-layout-morx-table.hh"
 
 SimpleEQProcessor::SimpleEQProcessor()
     : AudioProcessor(BusesProperties()
@@ -19,7 +19,7 @@ SimpleEQProcessor::~SimpleEQProcessor()
 
 const juce::String SimpleEQProcessor::getName() const
 {
-    return "EQ";
+    return "Basic-EQ";
 }
 
 bool SimpleEQProcessor::acceptsMidi() const
@@ -93,6 +93,16 @@ void SimpleEQProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     leftChain.prepare(spec);
     rightChain.prepare(spec);
+
+    updatePeakCoefficients();
+    // auto lowCutCoefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(
+    //     sampleRate,
+    //     chainSettings.lowCut
+    // );
+    // auto highCutCoefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(
+    //     sampleRate,
+    //     chainSettings.highCut
+    // );
 }
 
 void SimpleEQProcessor::releaseResources()
@@ -141,11 +151,13 @@ void SimpleEQProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::Mid
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
+    updatePeakCoefficients();
+
     const juce::dsp::AudioBlock<float> block(buffer);
     auto leftBlock = block.getSingleChannelBlock(0);
     auto rightBlock = block.getSingleChannelBlock(1);
-    juce::dsp::ProcessContextReplacing<float> leftContext {leftBlock};
-    juce::dsp::ProcessContextReplacing<float> rightContext {rightBlock};
+    const juce::dsp::ProcessContextReplacing<float> leftContext {leftBlock};
+    const juce::dsp::ProcessContextReplacing<float> rightContext {rightBlock};
 
     leftChain.process(leftContext);
     rightChain.process(rightContext);
@@ -177,6 +189,31 @@ void SimpleEQProcessor::setStateInformation(const void *data, int sizeInBytes)
     juce::ignoreUnused(data, sizeInBytes);
 }
 
+ChainSettings getChainSettings(juce::AudioProcessorValueTreeState &apvts) {
+    ChainSettings settings{
+        .peakFreq = apvts.getRawParameterValue("peak")->load(),
+        .peakQ = apvts.getRawParameterValue("peakQuality")->load(),
+        .peakGain = apvts.getRawParameterValue("peakGain")->load(),
+        .lowCut = apvts.getRawParameterValue("lowCut")->load(),
+        .highCut = apvts.getRawParameterValue("highCut")->load(),
+        .lowCutSlope = apvts.getRawParameterValue("lowCutSlope")->load(),
+        .highCutSlope = apvts .getRawParameterValue("highCutSlope")->load(),
+    };
+    return settings;
+}
+
+void SimpleEQProcessor::updatePeakCoefficients() {
+    auto chainSettings = getChainSettings(apvts);
+    auto peakCoefficients= juce::dsp::IIR::Coefficients<float>::makePeakFilter(
+        getSampleRate(),
+        chainSettings.peakFreq,
+        chainSettings.peakQ,
+        juce::Decibels::decibelsToGain(chainSettings.peakGain)
+    );
+    *leftChain.get<MonoPosition::Peak>().coefficients = *peakCoefficients;
+    *rightChain.get<MonoPosition::Peak>().coefficients = *peakCoefficients;
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout SimpleEQProcessor::createParameterLayout() {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
     constexpr auto versionHint = 1;
@@ -184,7 +221,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SimpleEQProcessor::createPar
       std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID {"lowCut", versionHint},
         "LowCut Frequency",
-        juce::NormalisableRange<float> {20.f, 20000.f, 1.f, 0.1f},
+        juce::NormalisableRange<float> {20.f, 20000.f, 1.f, 0.25f},
         20.f
       )
     );
@@ -192,7 +229,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SimpleEQProcessor::createPar
       std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID {"highCut", versionHint},
         "HighCut Frequency",
-        juce::NormalisableRange<float> {20.f, 20000.f, 1.f, 1.f},
+        juce::NormalisableRange<float> {20.f, 20000.f, 1.f, 0.25f},
         20000.f
       )
     );
@@ -200,7 +237,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SimpleEQProcessor::createPar
       std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID {"peak", versionHint},
         "Peak Frequency",
-        juce::NormalisableRange<float> {20.f, 20000.f, 1.f, 1.f},
+        juce::NormalisableRange<float> {20.f, 20000.f, 1.f, 0.25f},
         750.f
       )
     );
@@ -209,7 +246,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout SimpleEQProcessor::createPar
         juce::ParameterID {"peakGain", versionHint},
         "Peak Gain",
         juce::NormalisableRange<float> {-24.f, 24.f, 0.2f, 1.f},
-        0.f
+        0.f,
+        juce::AudioParameterFloatAttributes {}.withLabel("dB")
       )
     );
     layout.add(
