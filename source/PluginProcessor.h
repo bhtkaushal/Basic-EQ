@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 
 class SimpleEQProcessor final : public juce::AudioProcessor
 {
@@ -40,5 +41,9 @@ public:
     };
 
 private:
+    using Filter = juce::dsp::IIR::Filter<float>;
+    using CutoffChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
+    using MonoChain = juce::dsp::ProcessorChain<CutoffChain, Filter, CutoffChain>;
+    MonoChain leftChain, rightChain;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SimpleEQProcessor)
 };
