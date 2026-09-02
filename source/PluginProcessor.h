@@ -51,11 +51,13 @@ public:
 
 private:
     void updatePeakCoefficients();
+    void updateLowcutCoefficients();
+
     using Filter = juce::dsp::IIR::Filter<float>;
     using CutoffChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
     using MonoChain = juce::dsp::ProcessorChain<CutoffChain, Filter, CutoffChain>;
     MonoChain leftChain, rightChain;
-    enum MonoPosition {
+    enum MonoChainPosition {
         LowCut = 0,
         Peak,
         HighCut,

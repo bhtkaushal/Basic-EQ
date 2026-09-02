@@ -1,6 +1,5 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "juce_graphics/fonts/harfbuzz/hb-aat-layout-morx-table.hh"
 
 SimpleEQProcessor::SimpleEQProcessor()
     : AudioProcessor(BusesProperties()
@@ -95,14 +94,7 @@ void SimpleEQProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     rightChain.prepare(spec);
 
     updatePeakCoefficients();
-    // auto lowCutCoefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(
-    //     sampleRate,
-    //     chainSettings.lowCut
-    // );
-    // auto highCutCoefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(
-    //     sampleRate,
-    //     chainSettings.highCut
-    // );
+    updateLowcutCoefficients();
 }
 
 void SimpleEQProcessor::releaseResources()
@@ -152,6 +144,7 @@ void SimpleEQProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::Mid
         buffer.clear(i, 0, buffer.getNumSamples());
 
     updatePeakCoefficients();
+    updateLowcutCoefficients();
 
     const juce::dsp::AudioBlock<float> block(buffer);
     auto leftBlock = block.getSingleChannelBlock(0);
@@ -170,8 +163,8 @@ bool SimpleEQProcessor::hasEditor() const
 
 juce::AudioProcessorEditor *SimpleEQProcessor::createEditor()
 {
-    return new AudioPluginAudioProcessorEditor(*this);
-    // return new juce::GenericAudioProcessorEditor(*this);
+    // return new AudioPluginAudioProcessorEditor(*this);
+    return new juce::GenericAudioProcessorEditor(*this);
 }
 
 void SimpleEQProcessor::getStateInformation(juce::MemoryBlock &destData)
@@ -210,8 +203,54 @@ void SimpleEQProcessor::updatePeakCoefficients() {
         chainSettings.peakQ,
         juce::Decibels::decibelsToGain(chainSettings.peakGain)
     );
-    *leftChain.get<MonoPosition::Peak>().coefficients = *peakCoefficients;
-    *rightChain.get<MonoPosition::Peak>().coefficients = *peakCoefficients;
+
+    *leftChain.get<MonoChainPosition::Peak>().coefficients = *peakCoefficients;
+    *rightChain.get<MonoChainPosition::Peak>().coefficients = *peakCoefficients;
+}
+
+void SimpleEQProcessor::updateLowcutCoefficients() {
+    auto chainSettings = getChainSettings(apvts);
+    auto lowcutCoefficients =juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(
+        chainSettings.lowCut,
+        getSampleRate(),
+        static_cast<int>(chainSettings.lowCutSlope) / 6
+    );
+
+    auto& leftLowcut = leftChain.get<MonoChainPosition::LowCut>();
+    leftLowcut.setBypassed<0>(true);
+    leftLowcut.setBypassed<1>(true);
+    leftLowcut.setBypassed<2>(true);
+    leftLowcut.setBypassed<3>(true);
+    auto& rightLowcut = rightChain.get<MonoChainPosition::LowCut>();
+    rightLowcut.setBypassed<0>(true);
+    rightLowcut.setBypassed<1>(true);
+    rightLowcut.setBypassed<2>(true);
+    rightLowcut.setBypassed<3>(true);
+
+    if (lowcutCoefficients.size() > 0) {
+        *leftLowcut.get<0>().coefficients = *lowcutCoefficients[0];
+        *rightLowcut.get<0>().coefficients = *lowcutCoefficients[0];
+        leftLowcut.setBypassed<0>(false);
+        rightLowcut.setBypassed<0>(false);
+    }
+    if (lowcutCoefficients.size() > 1) {
+        *leftLowcut.get<1>().coefficients = *lowcutCoefficients[1];
+        *rightLowcut.get<1>().coefficients = *lowcutCoefficients[1];
+        leftLowcut.setBypassed<1>(false);
+        rightLowcut.setBypassed<1>(false);
+    }
+    if (lowcutCoefficients.size() > 2) {
+        *leftLowcut.get<2>().coefficients = *lowcutCoefficients[2];
+        *rightLowcut.get<2>().coefficients = *lowcutCoefficients[2];
+        leftLowcut.setBypassed<2>(false);
+        rightLowcut.setBypassed<2>(false);
+    }
+    if (lowcutCoefficients.size() > 3) {
+        *leftLowcut.get<3>().coefficients = *lowcutCoefficients[3];
+        *rightLowcut.get<3>().coefficients = *lowcutCoefficients[3];
+        leftLowcut.setBypassed<3>(false);
+        rightLowcut.setBypassed<3>(false);
+    }
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout SimpleEQProcessor::createParameterLayout() {
