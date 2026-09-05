@@ -5,11 +5,27 @@
 
 struct ChainSettings {
     float peakFreq{0}, peakQ{1.f}, peakGain{0};
-    float lowCut{0}, highCut{0};
-    float lowCutSlope{0}, highCutSlope{0};
+    float lowcutFreq{0}, highcutFreq{0};
+    float lowcutSlope{0}, highcutSlope{0};
 };
 
 ChainSettings getChainSettings(const juce::AudioProcessorValueTreeState &apvts);
+
+using Filter = juce::dsp::IIR::Filter<float>;
+using CutoffChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
+using MonoChain = juce::dsp::ProcessorChain<CutoffChain, Filter, CutoffChain>;
+
+enum MonoChainPosition {
+    Lowcut = 0,
+    Peak,
+    Highcut,
+};
+
+struct ParamIds {
+    static constexpr auto PeakFreq = "peakFreq", PeakQuality = "peakQuality", PeakGain = "peakGain";
+    static constexpr auto LowcutFreq = "lowcutFreq", HighcutFreq = "highcutFreq";
+    static constexpr auto LowcutSlope = "lowcutSlope", HighcutSlope = "highcutSlope";
+};
 
 class SimpleEQProcessor final : public juce::AudioProcessor {
 public:
@@ -62,22 +78,15 @@ public:
     };
 
 private:
-    using Filter = juce::dsp::IIR::Filter<float>;
-    using CutoffChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
-    using MonoChain = juce::dsp::ProcessorChain<CutoffChain, Filter, CutoffChain>;
     MonoChain leftChain, rightChain;
 
-    enum MonoChainPosition {
-        LowCut = 0,
-        Peak,
-        HighCut,
-    };
-
     void updatePeakFilter(const ChainSettings &chainSettings);
+
     void updateLowcutFilter(const ChainSettings &chainSettings);
+
     void updateHighcutFilter(const ChainSettings &chainSettings);
 
-    void updateFilters(const ChainSettings& chainSettings);
+    void updateFilters(const ChainSettings &chainSettings);
 
     template<int Index, typename ChainType, typename Coefficients>
     static void updateCoefficients(ChainType &leftChain, ChainType &rightChain, const Coefficients &coefficients) {
