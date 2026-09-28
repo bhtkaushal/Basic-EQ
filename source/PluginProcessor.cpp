@@ -139,7 +139,7 @@ bool SimpleEQProcessor::hasEditor() const {
 }
 
 juce::AudioProcessorEditor *SimpleEQProcessor::createEditor() {
-    return new AudioPluginAudioProcessorEditor(*this);
+    return new SimpleEQProcessorEditor(*this);
     // return new juce::GenericAudioProcessorEditor(*this);
 }
 

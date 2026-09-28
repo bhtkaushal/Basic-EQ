@@ -8,20 +8,21 @@ struct RotatorySlider : juce::Slider {
     }
 };
 
-class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor {
+class SimpleEQProcessorEditor final : public juce::AudioProcessorEditor, juce::AudioProcessorParameter::Listener, juce::Timer {
 public:
-    explicit AudioPluginAudioProcessorEditor(SimpleEQProcessor &);
-
-    ~AudioPluginAudioProcessorEditor() override;
-
-    void paint(juce::Graphics &) override;
-
+    explicit SimpleEQProcessorEditor(SimpleEQProcessor &);
+    ~SimpleEQProcessorEditor() override;
+    void paint(juce::Graphics&) override;
     void resized() override;
 
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override { }
+    void timerCallback() override;
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     SimpleEQProcessor &processorRef;
+    juce::Atomic<bool> parameterChanged { false };
 
     RotatorySlider
             peakFreqSlider,
@@ -44,8 +45,7 @@ private:
             highcutFreqSliderAttachment,
             highcutSlopeSliderAttachment;
 
-    MonoChain monoChain; 
+    MonoChain monoChain;
 
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SimpleEQProcessorEditor)
 };
